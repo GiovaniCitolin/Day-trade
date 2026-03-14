@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day Trade</title>
+
+<style>
+body{
+font-family:Arial, Helvetica, sans-serif;
+background:#f4f6fb;
+margin:0;
+padding:20px;
+}
+
+.container{
+max-width:700px;
+margin:auto;
+}
+
+.card{
+background:white;
+padding:20px;
+border-radius:16px;
+box-shadow:0 4px 15px rgba(0,0,0,0.08);
+margin-bottom:20px;
+}
+
+h1{
+margin-top:0;
+}
+
+input{
+width:100%;
+padding:12px;
+margin-top:5px;
+margin-bottom:15px;
+border-radius:8px;
+border:1px solid #ccc;
+font-size:16px;
+}
+
+button{
+padding:12px;
+border:none;
+border-radius:8px;
+font-size:16px;
+cursor:pointer;
+}
+
+.btn-save{background:#16a34a;color:white;}
+.btn-delete{background:#dc2626;color:white;}
+.btn-clear{background:#999;color:white;}
+
+.result{
+font-size:22px;
+font-weight:bold;
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+margin-top:10px;
+}
+
+th,td{
+padding:10px;
+border-bottom:1px solid #eee;
+text-align:center;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="card">
+<h1>Day Trade</h1>
+
+<label>Data</label>
+<input type="date" id="data">
+
+<label>Resultado Bruto</label>
+<input type="number" id="bruto" step="0.01">
+
+<label>Custos Operacionais</label>
+<input type="number" id="custos" step="0.01">
+
+<label>IRRF Day Trade</label>
+<input type="number" id="irrf" step="0.01">
+
+<label>Ajuste Day Trade</label>
+<input type="number" id="ajuste" step="0.01">
+
+<div class="result">
+Resultado Líquido: <span id="liquido">R$0,00</span>
+</div>
+
+<br>
+
+<button class="btn-save" onclick="salvar()">Salvar</button>
+<button class="btn-clear" onclick="limpar()">Limpar</button>
+
+</div>
+
+<div class="card">
+<h2>Saldo acumulado</h2>
+<div class="result" id="saldo">R$0,00</div>
+</div>
+
+<div class="card">
+
+<h2>Histórico</h2>
+
+<table>
+
+<thead>
+<tr>
+<th>Data</th>
+<th>Bruto</th>
+<th>Custos</th>
+<th>IRRF</th>
+<th>Ajuste</th>
+<th>Líquido</th>
+<th></th>
+</tr>
+</thead>
+
+<tbody id="tabela"></tbody>
+
+</table>
+
+</div>
+
+</div>
+
+<script>
+
+let dados = JSON.parse(localStorage.getItem("trades") || "[]")
+
+function moeda(v){
+return Number(v).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})
+}
+
+function calcular(){
+
+let bruto = parseFloat(brutoInput.value)||0
+let custos = parseFloat(custosInput.value)||0
+let irrf = parseFloat(irrfInput.value)||0
+let ajuste = parseFloat(ajusteInput.value)||0
+
+let liquido = bruto - custos - irrf + ajuste
+
+liquidoSpan.innerText = moeda(liquido)
+
+}
+
+const brutoInput = document.getElementById("bruto")
+const custosInput = document.getElementById("custos")
+const irrfInput = document.getElementById("irrf")
+const ajusteInput = document.getElementById("ajuste")
+const liquidoSpan = document.getElementById("liquido")
+
+brutoInput.oninput = calcular
+custosInput.oninput = calcular
+irrfInput.oninput = calcular
+ajusteInput.oninput = calcular
+
+function salvar(){
+
+let data = document.getElementById("data").value
+
+let bruto = parseFloat(brutoInput.value)||0
+let custos = parseFloat(custosInput.value)||0
+let irrf = parseFloat(irrfInput.value)||0
+let ajuste = parseFloat(ajusteInput.value)||0
+
+let liquido = bruto - custos - irrf + ajuste
+
+dados.push({
+data,bruto,custos,irrf,ajuste,liquido
+})
+
+localStorage.setItem("trades",JSON.stringify(dados))
+
+render()
+
+limpar()
+
+}
+
+function limpar(){
+
+document.getElementById("data").value=""
+brutoInput.value=""
+custosInput.value=""
+irrfInput.value=""
+ajusteInput.value=""
+
+liquidoSpan.innerText="R$0,00"
+
+}
+
+function excluir(i){
+
+dados.splice(i,1)
+
+localStorage.setItem("trades",JSON.stringify(dados))
+
+render()
+
+}
+
+function render(){
+
+let tabela = document.getElementById("tabela")
+
+tabela.innerHTML=""
+
+let saldo=0
+
+dados.forEach((t,i)=>{
+
+saldo+=t.liquido
+
+tabela.innerHTML+=`
+
+<tr>
+
+<td>${t.data}</td>
+<td>${moeda(t.bruto)}</td>
+<td>${moeda(t.custos)}</td>
+<td>${moeda(t.irrf)}</td>
+<td>${moeda(t.ajuste)}</td>
+<td>${moeda(t.liquido)}</td>
+
+<td>
+<button class="btn-delete" onclick="excluir(${i})">X</button>
+</td>
+
+</tr>
+
+`
+
+})
+
+document.getElementById("saldo").innerText=moeda(saldo)
+
+}
+
+render()
+
+</script>
+
+</body>
+</html>
