@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Day Trade - Controle Diário</title>
   <meta name="theme-color" content="#0f172a" />
-  
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     :root{
       --bg:#f3f5f9;
@@ -528,26 +528,6 @@
     let imagemAtual = null;
     let textoOCRAtual = "";
 
-    let tesseractLoaded = false;
-    async function garantirTesseract(){
-      if(window.Tesseract) {
-        tesseractLoaded = true;
-        return;
-      }
-      refs.ocrStatus.textContent = "Carregando leitor OCR...";
-      await new Promise((resolve, reject) => {
-        const s = document.createElement("script");
-        s.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
-        s.onload = () => {
-          tesseractLoaded = true;
-          resolve();
-        };
-        s.onerror = () => reject(new Error("Falha ao carregar Tesseract"));
-        document.head.appendChild(s);
-      });
-    }
-
-
     iniciar();
 
     function iniciar(){
@@ -638,8 +618,7 @@
       refs.btnLerNota.textContent = "Lendo...";
 
       try{
-        await garantirTesseract();
-        const result = await Tesseract.recognize(imagemAtual, "eng", {
+        const result = await Tesseract.recognize(imagemAtual, "por+eng", {
           logger: m => {
             if(m.status){
               const pct = m.progress ? ` ${Math.round(m.progress * 100)}%` : "";
@@ -663,52 +642,24 @@
       }
     }
 
+    
+    function removerAcentos(str){
+      return (str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    }
+
     function normalizarTexto(txt){
-      return txt
+      return removerAcentos(txt)
         .replace(/\r/g, "\n")
         .replace(/[|]/g, " ")
         .replace(/[“”"]/g, "")
-        .replace(/\s+/g, " ")
+        .replace(/[^\S\n]+/g, " ")
         .trim();
     }
 
     function extrairData(txt){
-      const m = txt.match(/\b(\d{2}\/\d{2}\/\d{4})\b/);
+      const t = normalizarTexto(txt);
+      const m = t.match(/\b(\d{2}\/\d{2}\/\d{4})\b/);
       return m ? m[1] : "";
-    }
-
-    function extrairValorPorRotulo(txt, labels){
-      const lines = txt.split(/\n+/).map(l => l.trim()).filter(Boolean);
-      const normalizedLines = lines.map(l => l.toLowerCase());
-
-      for(let i=0;i<normalizedLines.length;i++){
-        const line = normalizedLines[i];
-        for(const label of labels){
-          if(line.includes(label)){
-            const candidate = lines[i] + " " + (lines[i+1] || "");
-            const value = ultimoValorBR(candidate);
-            if(value !== null) return value;
-          }
-        }
-      }
-
-      const normalizedAll = normalizarTexto(txt).toLowerCase();
-      for(const label of labels){
-        const idx = normalizedAll.indexOf(label);
-        if(idx !== -1){
-          const snippet = normalizedAll.slice(idx, idx + 140);
-          const value = ultimoValorBR(snippet);
-          if(value !== null) return value;
-        }
-      }
-      return null;
-    }
-
-    function ultimoValorBR(fragment){
-      const matches = [...fragment.matchAll(/-?\d{1,3}(?:\.\d{3})*,\d{2}/g)].map(m => m[0]);
-      if(!matches.length) return null;
-      let raw = matches[matches.length - 1];
-      return paraNumeroBR(raw);
     }
 
     function paraNumeroBR(s){
@@ -716,76 +667,127 @@
       return parseFloat(String(s).replace(/\./g, "").replace(",", "."));
     }
 
-    function detectarCreditoDebito(txt, labels){
-      const normalized = normalizarTexto(txt).toLowerCase();
+    function listarValoresBR(fragment){
+      return [...String(fragment).matchAll(/-?\d{1,3}(?:\.\d{3})*,\d{2}/g)].map(m => paraNumeroBR(m[0]));
+    }
+
+    function ultimoValorBR(fragment){
+      const vals = listarValoresBR(fragment);
+      return vals.length ? vals[vals.length - 1] : null;
+    }
+
+    function acharValorPertoDeLabels(txt, labels){
+      const t = normalizarTexto(txt).toLowerCase();
       for(const label of labels){
-        const idx = normalized.indexOf(label);
+        const idx = t.indexOf(label);
         if(idx !== -1){
-          const snippet = normalized.slice(idx, idx + 160);
-          if(/\b\d{1,3}(?:\.\d{3})*,\d{2}\s*c\b/.test(snippet)) return 1;
-          if(/\b\d{1,3}(?:\.\d{3})*,\d{2}\s*d\b/.test(snippet)) return -1;
+          const snippet = t.slice(Math.max(0, idx - 20), idx + 220);
+          const val = ultimoValorBR(snippet);
+          if(val !== null) return val;
+        }
+      }
+      return null;
+    }
+
+    function detectarCreditoDebito(txt, labels){
+      const t = normalizarTexto(txt).toLowerCase();
+      for(const label of labels){
+        const idx = t.indexOf(label);
+        if(idx !== -1){
+          const snippet = t.slice(Math.max(0, idx - 20), idx + 220);
+          if(/\d{1,3}(?:\.\d{3})*,\d{2}\s*c\b/.test(snippet)) return 1;
+          if(/\d{1,3}(?:\.\d{3})*,\d{2}\s*d\b/.test(snippet)) return -1;
         }
       }
       return 1;
     }
 
+    function preencherSeEncontrado(input, valor){
+      if(valor !== null && valor !== undefined && !Number.isNaN(valor)){
+        input.value = Number(valor).toFixed(2);
+        return true;
+      }
+      return false;
+    }
+
     function aplicarDadosExtraidos(texto){
-      const data = extrairData(texto);
-      const custos = extrairValorPorRotulo(texto, [
+      const t = normalizarTexto(texto);
+
+      const data = extrairData(t);
+
+      let custos = acharValorPertoDeLabels(t, [
         "total de custos operacionais",
-        "total de custos operacionais",
-        "custos operacionais"
+        "custos operacionais",
+        "taxas bmf",
+        "taxas bm&f",
+        "taxa operacional"
       ]);
 
-      const irrf = extrairValorPorRotulo(texto, [
+      let irrf = acharValorPertoDeLabels(t, [
         "irrf day trade",
         "irrf day trade (proj.)",
-        "irrf day trade proj"
+        "irrf day trade proj",
+        "irrf operacional",
+        "irrf"
       ]);
 
-      let ajuste = extrairValorPorRotulo(texto, [
+      let ajuste = acharValorPertoDeLabels(t, [
         "ajuste day trade",
-        "ajuste daytrade"
+        "ajuste daytrade",
+        "ajuste de posicao",
+        "ajuste de posiçao"
       ]);
+
+      let totalLiquidoNota = acharValorPertoDeLabels(t, [
+        "total liquido da nota",
+        "total liquido",
+        "total liquido (#)"
+      ]);
+
+      let valorNegocios = acharValorPertoDeLabels(t, [
+        "valor dos negocios",
+        "venda disponivel",
+        "compra disponivel"
+      ]);
+
       if(ajuste !== null){
-        const sinal = detectarCreditoDebito(texto, ["ajuste day trade","ajuste daytrade"]);
+        const sinal = detectarCreditoDebito(t, [
+          "ajuste day trade",
+          "ajuste daytrade",
+          "ajuste de posicao",
+          "ajuste de posiçao"
+        ]);
         ajuste = ajuste * sinal;
       }
 
-      const totalLiquidoNota = extrairValorPorRotulo(texto, [
-        "total liquido da nota",
-        "total líquido da nota",
-        "total liquido"
-      ]);
+      if(custos === null && totalLiquidoNota !== null && valorNegocios !== null){
+        custos = valorNegocios - (totalLiquidoNota + (irrf || 0) - (ajuste || 0));
+        if(Math.abs(custos) < 0.01) custos = 0;
+      }
 
-      const valorNegocios = extrairValorPorRotulo(texto, [
-        "valor dos negocios",
-        "valor dos negócios"
-      ]);
+      let preenchidos = 0;
 
       if(data){
         refs.data.value = paraISO(data);
+        preenchidos++;
       }
-      if(custos !== null){
-        refs.custos.value = custos.toFixed(2);
-      }
-      if(irrf !== null){
-        refs.irrf.value = irrf.toFixed(2);
-      }
-      if(ajuste !== null){
-        refs.ajuste.value = ajuste.toFixed(2);
-      }
-      if(totalLiquidoNota !== null){
-        refs.totalNota.value = totalLiquidoNota.toFixed(2);
-      }
-      if(valorNegocios !== null && parseNum(refs.bruto.value) === 0){
-        refs.bruto.value = valorNegocios.toFixed(2);
-      }
+      if(preencherSeEncontrado(refs.custos, custos)) preenchidos++;
+      if(preencherSeEncontrado(refs.irrf, irrf)) preenchidos++;
+      if(preencherSeEncontrado(refs.ajuste, ajuste)) preenchidos++;
+      if(preencherSeEncontrado(refs.totalNota, totalLiquidoNota)) preenchidos++;
+      if(parseNum(refs.bruto.value) === 0 && preencherSeEncontrado(refs.bruto, valorNegocios)) preenchidos++;
 
       calcularLiquidoTela();
+
+      if(preenchidos === 0){
+        refs.ocrStatus.textContent = "A imagem foi lida, mas os campos não foram reconhecidos automaticamente.";
+        mostrarStatus("Li o print, mas não consegui identificar os campos. Tente um corte mais próximo da área dos valores.", "warn");
+      }else{
+        refs.ocrStatus.textContent = `Leitura concluída. ${preenchidos} campo(s) preenchido(s).`;
+      }
     }
 
-    function salvarRegistro(){
+function salvarRegistro(){
       if(!refs.data.value){
         mostrarStatus("Informe a data.", "warn");
         return;
