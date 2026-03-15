@@ -111,6 +111,7 @@
     .btn-delete{background:linear-gradient(180deg,#dd4d43,#ba332b)}
     .btn-clear{background:linear-gradient(180deg,#8693a6,#6c7888)}
     .btn-history{background:linear-gradient(180deg,#6d28d9,#5b21b6)}
+    .btn-export{background:linear-gradient(180deg,#0f766e,#0b5d56)}
     .summary{
       display:grid;
       grid-template-columns:repeat(4,1fr);
@@ -301,6 +302,7 @@
           <button class="btn-delete" id="btnExcluir">Excluir Selecionado</button>
           <button class="btn-clear" id="btnLimpar">Limpar Campos</button>
           <button class="btn-history" id="btnHistorico">Histórico Fiscal</button>
+          <button class="btn-export" id="btnExportar">Salvar Histórico</button>
         </div>
 
         <div id="status" class="status"></div>
@@ -423,6 +425,7 @@
     const btnExcluir = document.getElementById("btnExcluir");
     const btnLimpar = document.getElementById("btnLimpar");
     const btnHistorico = document.getElementById("btnHistorico");
+    const btnExportar = document.getElementById("btnExportar");
     const modalHistorico = document.getElementById("modalHistorico");
     const btnFecharHistorico = document.getElementById("btnFecharHistorico");
     const tabelaHistoricoMensal = document.getElementById("tabelaHistoricoMensal");
@@ -451,6 +454,7 @@
       btnExcluir.addEventListener("click", excluirSelecionado);
       btnLimpar.addEventListener("click", limparCampos);
       btnHistorico.addEventListener("click", abrirHistorico);
+      btnExportar.addEventListener("click", exportarHistoricoWord);
       btnFecharHistorico.addEventListener("click", fecharHistorico);
       modalHistorico.addEventListener("click", (e) => {
         if(e.target === modalHistorico) fecharHistorico();
@@ -785,24 +789,7 @@
         historicoPrejuizoAtual.className = "value";
         historicoTotalMeses.textContent = "0";
       } else {
-        tabelaHistoricoMensal.innerHTML = mesesDesc.map(chave => {
-          const item = resumo[chave];
-          return `
-            <tr>
-              <td>${formatarMes(chave)}</td>
-              <td>${formatarMoeda(item.bruto)}</td>
-              <td>${formatarMoeda(item.taxas)}</td>
-              <td>${formatarMoeda(item.irrf)}</td>
-              <td class="${item.resultadoMes >= 0 ? 'positive' : 'negative'}">${formatarMoeda(item.resultadoMes)}</td>
-              <td>${formatarMoeda(item.prejuizoCompensado)}</td>
-              <td>${formatarMoeda(item.baseTributavel)}</td>
-              <td>${formatarMoeda(item.irDevido)}</td>
-              <td>${formatarMoeda(item.irrfUsado)}</td>
-              <td>${formatarMoeda(item.darfEstimada)}</td>
-              <td class="${item.prejuizoAcumulado > 0 ? 'negative' : 'positive'}"><strong>${formatarMoeda(item.prejuizoAcumulado)}</strong></td>
-            </tr>
-          `;
-        }).join("");
+        tabelaHistoricoMensal.innerHTML = montarLinhasHistoricoHtml();
 
         const acumuladoGeral = mesesOrdenados.reduce((acc, chave) => acc + resumo[chave].saldoMesAposIR, 0);
         historicoAcumuladoGeral.textContent = formatarMoeda(acumuladoGeral);
@@ -814,6 +801,123 @@
 
       modalHistorico.classList.add("show");
     }
+
+
+    function montarLinhasHistoricoHtml(){
+      const { resumo, mesesOrdenados } = calcularResumoFiscal();
+      const mesesDesc = [...mesesOrdenados].reverse();
+
+      if(mesesDesc.length === 0){
+        return `<tr><td colspan="11" style="padding:18px;text-align:center;">Nenhum mês lançado ainda.</td></tr>`;
+      }
+
+      return mesesDesc.map(chave => {
+        const item = resumo[chave];
+        return `
+            <tr>
+              <td>${formatarMes(chave)}</td>
+              <td>${formatarMoeda(item.bruto)}</td>
+              <td>${formatarMoeda(item.taxas)}</td>
+              <td>${formatarMoeda(item.irrf)}</td>
+              <td>${item.resultadoMes >= 0 ? formatarMoeda(item.resultadoMes) : '-' + formatarMoeda(Math.abs(item.resultadoMes))}</td>
+              <td>${formatarMoeda(item.prejuizoCompensado)}</td>
+              <td>${formatarMoeda(item.baseTributavel)}</td>
+              <td>${formatarMoeda(item.irDevido)}</td>
+              <td>${formatarMoeda(item.irrfUsado)}</td>
+              <td>${formatarMoeda(item.darfEstimada)}</td>
+              <td>${formatarMoeda(item.prejuizoAcumulado)}</td>
+            </tr>
+        `;
+      }).join("");
+    }
+
+    function exportarHistoricoWord(){
+      const { resumo, mesesOrdenados, prejuizoFinal } = calcularResumoFiscal();
+      const acumuladoGeral = mesesOrdenados.reduce((acc, chave) => acc + resumo[chave].saldoMesAposIR, 0);
+      const dataGeracao = new Date().toLocaleString("pt-BR");
+      const linhas = montarLinhasHistoricoHtml();
+
+      const conteudo = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office"
+              xmlns:w="urn:schemas-microsoft-com:office:word"
+              xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+          <meta charset="utf-8">
+          <title>Historico_Fiscal_Day_Trade</title>
+          <style>
+            body { font-family: Arial, Helvetica, sans-serif; color:#1f2937; }
+            h1 { color:#123e7a; text-align:center; }
+            .meta { margin: 12px 0 18px; font-size:14px; }
+            .box-wrap { margin: 10px 0 18px; }
+            .box {
+              display:inline-block; width:30%; min-width:180px; margin-right:1%;
+              border:1px solid #d7dfeb; border-radius:10px; padding:10px 12px; vertical-align:top;
+              background:#eaf2ff;
+            }
+            .label { color:#123e7a; font-weight:700; font-size:13px; margin-bottom:6px; }
+            .value { font-size:18px; font-weight:700; }
+            table { width:100%; border-collapse:collapse; font-size:13px; }
+            th, td { border:1px solid #d7dfeb; padding:8px; text-align:center; }
+            th { background:#eef4fb; color:#123e7a; }
+          </style>
+        </head>
+        <body>
+          <h1>Histórico Fiscal - Day Trade</h1>
+          <div class="meta">
+            <strong>Gerado em:</strong> ${dataGeracao}
+          </div>
+          <div class="box-wrap">
+            <div class="box">
+              <div class="label">Saldo Geral (após IR)</div>
+              <div class="value">${formatarMoeda(acumuladoGeral)}</div>
+            </div>
+            <div class="box">
+              <div class="label">Prejuízo Atual a Compensar</div>
+              <div class="value">${formatarMoeda(prejuizoFinal)}</div>
+            </div>
+            <div class="box">
+              <div class="label">Meses Lançados</div>
+              <div class="value">${String(mesesOrdenados.length)}</div>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Mês</th>
+                <th>Total Bruto</th>
+                <th>Total Custos</th>
+                <th>IRRF do Mês</th>
+                <th>Resultado Líquido</th>
+                <th>Prejuízo Compensado</th>
+                <th>Base Tributável</th>
+                <th>IR 20%</th>
+                <th>IRRF Usado</th>
+                <th>DARF Estimada</th>
+                <th>Prejuízo a Compensar</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${linhas}
+            </tbody>
+          </table>
+        </body>
+        </html>
+      `;
+
+      const blob = new Blob(['\ufeff', conteudo], { type: "application/msword" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const hoje = hojeISO().replaceAll("-", "");
+      a.href = url;
+      a.download = `historico_fiscal_day_trade_${hoje}.doc`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+      mostrarStatus("Histórico exportado em Word com sucesso.", "ok");
+    }
+
 
     function fecharHistorico(){
       modalHistorico.classList.remove("show");
