@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Controle de Resultados - Day Trade</title>
+  <title>Controle Fiscal - Day Trade</title>
   <style>
     :root{
       --azul:#123e7a;
@@ -26,7 +26,7 @@
       padding:20px;
     }
     .container{
-      width:min(1100px,100%);
+      width:min(1180px,100%);
       margin:0 auto;
     }
     .card{
@@ -113,7 +113,7 @@
     .btn-history{background:linear-gradient(180deg,#6d28d9,#5b21b6)}
     .summary{
       display:grid;
-      grid-template-columns:repeat(3,1fr);
+      grid-template-columns:repeat(4,1fr);
       gap:16px;
     }
     .summary-box{
@@ -126,11 +126,11 @@
     .summary-box .label{
       color:var(--azul);
       font-weight:700;
-      font-size:18px;
+      font-size:17px;
       margin-bottom:8px;
     }
     .summary-box .value{
-      font-size:clamp(24px,4vw,40px);
+      font-size:clamp(22px,3.2vw,34px);
       font-weight:700;
     }
     .positive{color:var(--verde)}
@@ -146,6 +146,7 @@
     .toolbar small{
       color:#5b6d84;
       font-size:14px;
+      max-width:780px;
     }
     .table-wrap{
       overflow:auto;
@@ -155,19 +156,19 @@
     table{
       width:100%;
       border-collapse:collapse;
-      min-width:900px;
+      min-width:1050px;
       background:#fff;
     }
     th, td{
       padding:14px 12px;
       text-align:center;
       border-bottom:1px solid #e2e8f0;
-      font-size:17px;
+      font-size:16px;
     }
     th{
       background:#eef4fb;
       color:var(--azul);
-      font-size:18px;
+      font-size:17px;
     }
     tr:last-child td{border-bottom:none}
     tr.selected{
@@ -212,7 +213,7 @@
     }
     .modal.show{display:flex}
     .modal-card{
-      width:min(900px,100%);
+      width:min(1160px,100%);
       max-height:90vh;
       overflow:auto;
       background:#fff;
@@ -244,12 +245,12 @@
     }
     .totals-grid{
       display:grid;
-      grid-template-columns:repeat(2,1fr);
+      grid-template-columns:repeat(3,1fr);
       gap:16px;
       margin-bottom:16px;
     }
 
-    @media (max-width: 820px){
+    @media (max-width: 900px){
       body{padding:12px}
       .content{padding:16px}
       .form-grid,.summary,.totals-grid{grid-template-columns:1fr}
@@ -261,7 +262,7 @@
 <body>
   <div class="container">
     <div class="card">
-      <div class="header">Controle de Resultados - Day Trade</div>
+      <div class="header">Controle Fiscal - Day Trade</div>
       <div class="content">
         <h2 class="section-title">Lançar Resultado do Dia</h2>
 
@@ -277,14 +278,20 @@
           </div>
 
           <div class="field">
-            <label for="taxas">Taxas da Corretora (R$)</label>
+            <label for="taxas">Custos / Taxas (R$)</label>
             <input type="number" id="taxas" step="0.01" placeholder="Ex: 50,00" />
           </div>
 
           <div class="field">
-            <label for="imposto">IR do Mês (20% sobre saldo mensal)</label>
+            <label for="irrf">IRRF Day Trade do Dia (R$)</label>
+            <input type="number" id="irrf" step="0.01" placeholder="Ex: 3,25" />
+            <div class="hint">Informe o IRRF retido na nota, quando houver.</div>
+          </div>
+
+          <div class="field" style="grid-column:1 / -1;">
+            <label for="imposto">DARF estimada do mês</label>
             <input type="text" id="imposto" readonly />
-            <div class="hint">Zera automaticamente no início de cada mês.</div>
+            <div class="hint">Já considera prejuízo acumulado e compensação do IRRF do mesmo ano.</div>
           </div>
         </div>
 
@@ -293,7 +300,7 @@
           <button class="btn-edit" id="btnEditar">Editar Selecionado</button>
           <button class="btn-delete" id="btnExcluir">Excluir Selecionado</button>
           <button class="btn-clear" id="btnLimpar">Limpar Campos</button>
-          <button class="btn-history" id="btnHistorico">Histórico</button>
+          <button class="btn-history" id="btnHistorico">Histórico Fiscal</button>
         </div>
 
         <div id="status" class="status"></div>
@@ -305,15 +312,19 @@
         <div class="summary">
           <div class="summary-box">
             <div class="label">Resultado do Dia</div>
-            <div id="resultadoLiquidoDia" class="value">R$ 0,00</div>
+            <div id="resultadoDia" class="value">R$ 0,00</div>
           </div>
           <div class="summary-box">
-            <div class="label">Saldo do Mês</div>
+            <div class="label">Saldo do Mês (após IR)</div>
             <div id="saldoMes" class="value">R$ 0,00</div>
           </div>
           <div class="summary-box">
-            <div class="label">Saldo Geral</div>
-            <div id="saldoAcumulado" class="value">R$ 0,00</div>
+            <div class="label">Prejuízo a Compensar</div>
+            <div id="prejuizoCompensar" class="value">R$ 0,00</div>
+          </div>
+          <div class="summary-box">
+            <div class="label">Saldo Geral (após IR)</div>
+            <div id="saldoGeral" class="value">R$ 0,00</div>
           </div>
         </div>
       </div>
@@ -322,8 +333,8 @@
     <div class="card">
       <div class="content">
         <div class="toolbar">
-          <h2 class="section-title" style="margin:0; text-align:left;">Histórico de Resultados</h2>
-          <small>Os dados ficam salvos localmente no navegador do aparelho.</small>
+          <h2 class="section-title" style="margin:0; text-align:left;">Lançamentos</h2>
+          <small>O app calcula a apuração mensal estimada: resultado líquido do mês, compensação de prejuízos acumulados de day trade e abatimento do IRRF do mesmo ano.</small>
         </div>
 
         <div class="table-wrap">
@@ -333,7 +344,8 @@
                 <th>Selecionar</th>
                 <th>Data</th>
                 <th>Resultado Bruto</th>
-                <th>Taxas</th>
+                <th>Custos</th>
+                <th>IRRF</th>
                 <th>Resultado do Dia</th>
                 <th>Mês</th>
                 <th>Ações</th>
@@ -349,17 +361,21 @@
   <div class="modal" id="modalHistorico">
     <div class="modal-card">
       <div class="modal-header">
-        <h3>Histórico Mensal</h3>
+        <h3>Histórico Fiscal Mensal</h3>
         <button class="close-btn" id="btnFecharHistorico">Fechar</button>
       </div>
       <div class="modal-body">
         <div class="totals-grid">
           <div class="summary-box">
-            <div class="label">Acumulado Geral</div>
+            <div class="label">Saldo Geral (após IR)</div>
             <div id="historicoAcumuladoGeral" class="value">R$ 0,00</div>
           </div>
           <div class="summary-box">
-            <div class="label">Total de Meses</div>
+            <div class="label">Prejuízo Atual a Compensar</div>
+            <div id="historicoPrejuizoAtual" class="value">R$ 0,00</div>
+          </div>
+          <div class="summary-box">
+            <div class="label">Meses Lançados</div>
             <div id="historicoTotalMeses" class="value">0</div>
           </div>
         </div>
@@ -370,9 +386,15 @@
               <tr>
                 <th>Mês</th>
                 <th>Total Bruto</th>
-                <th>Total Taxas</th>
-                <th>IR do Mês (20%)</th>
-                <th>Saldo do Mês</th>
+                <th>Total Custos</th>
+                <th>IRRF do Mês</th>
+                <th>Resultado Líquido</th>
+                <th>Prejuízo Compensado</th>
+                <th>Base Tributável</th>
+                <th>IR 20%</th>
+                <th>IRRF Usado</th>
+                <th>DARF Estimada</th>
+                <th>Prejuízo a Compensar</th>
               </tr>
             </thead>
             <tbody id="tabelaHistoricoMensal"></tbody>
@@ -383,15 +405,17 @@
   </div>
 
   <script>
-    const STORAGE_KEY = "daytrade_resultados_mensal_v2";
+    const STORAGE_KEY = "daytrade_fiscal_v3";
 
     const elData = document.getElementById("data");
     const elBruto = document.getElementById("resultadoBruto");
     const elTaxas = document.getElementById("taxas");
-    const elImposto = document.getElementById("imposto");
-    const elResultadoDia = document.getElementById("resultadoLiquidoDia");
+    const elIrrf = document.getElementById("irrf");
+    const elDarfMes = document.getElementById("imposto");
+    const elResultadoDia = document.getElementById("resultadoDia");
     const elSaldoMes = document.getElementById("saldoMes");
-    const elSaldoGeral = document.getElementById("saldoAcumulado");
+    const elSaldoGeral = document.getElementById("saldoGeral");
+    const elPrejuizoCompensar = document.getElementById("prejuizoCompensar");
     const elTabela = document.getElementById("tabelaResultados");
     const elStatus = document.getElementById("status");
     const btnSalvar = document.getElementById("btnSalvar");
@@ -403,6 +427,7 @@
     const btnFecharHistorico = document.getElementById("btnFecharHistorico");
     const tabelaHistoricoMensal = document.getElementById("tabelaHistoricoMensal");
     const historicoAcumuladoGeral = document.getElementById("historicoAcumuladoGeral");
+    const historicoPrejuizoAtual = document.getElementById("historicoPrejuizoAtual");
     const historicoTotalMeses = document.getElementById("historicoTotalMeses");
 
     let resultados = carregarResultados();
@@ -420,9 +445,7 @@
     }
 
     function adicionarEventos(){
-      elBruto.addEventListener("input", atualizarCalculosTela);
-      elTaxas.addEventListener("input", atualizarCalculosTela);
-      elData.addEventListener("input", atualizarCalculosTela);
+      [elBruto, elTaxas, elIrrf, elData].forEach(el => el.addEventListener("input", atualizarCalculosTela));
       btnSalvar.addEventListener("click", salvarResultado);
       btnEditar.addEventListener("click", editarSelecionado);
       btnExcluir.addEventListener("click", excluirSelecionado);
@@ -469,49 +492,94 @@
       return dataISO.slice(0, 7);
     }
 
+    function obterAno(dataISO){
+      return dataISO.slice(0, 4);
+    }
+
     function calcularResultadoDia(bruto, taxas){
       return bruto - taxas;
     }
 
-    function calcularImpostoMensal(saldoMensalAntesIR){
-      return saldoMensalAntesIR > 0 ? saldoMensalAntesIR * 0.20 : 0;
-    }
-
-    function obterResumoMensal(previewRegistro = null){
-      const mapa = {};
+    function calcularResumoFiscal(previewRegistro = null){
+      const agregados = {};
 
       resultados.forEach(item => {
         if(previewRegistro && item.id === previewRegistro.id) return;
         const chave = obterAnoMes(item.data);
-        if(!mapa[chave]){
-          mapa[chave] = { bruto:0, taxas:0, saldoAntesIR:0 };
+        if(!agregados[chave]){
+          agregados[chave] = { bruto:0, taxas:0, irrf:0, resultadoMes:0 };
         }
-        mapa[chave].bruto += item.bruto;
-        mapa[chave].taxas += item.taxas;
-        mapa[chave].saldoAntesIR += item.resultadoDia;
+        agregados[chave].bruto += item.bruto;
+        agregados[chave].taxas += item.taxas;
+        agregados[chave].irrf += item.irrf || 0;
+        agregados[chave].resultadoMes += item.resultadoDia;
       });
 
       if(previewRegistro){
         const chave = obterAnoMes(previewRegistro.data);
-        if(!mapa[chave]){
-          mapa[chave] = { bruto:0, taxas:0, saldoAntesIR:0 };
+        if(!agregados[chave]){
+          agregados[chave] = { bruto:0, taxas:0, irrf:0, resultadoMes:0 };
         }
-        mapa[chave].bruto += previewRegistro.bruto;
-        mapa[chave].taxas += previewRegistro.taxas;
-        mapa[chave].saldoAntesIR += previewRegistro.resultadoDia;
+        agregados[chave].bruto += previewRegistro.bruto;
+        agregados[chave].taxas += previewRegistro.taxas;
+        agregados[chave].irrf += previewRegistro.irrf || 0;
+        agregados[chave].resultadoMes += previewRegistro.resultadoDia;
       }
 
-      Object.keys(mapa).forEach(chave => {
-        mapa[chave].imposto = calcularImpostoMensal(mapa[chave].saldoAntesIR);
-        mapa[chave].saldoMes = mapa[chave].saldoAntesIR - mapa[chave].imposto;
+      const mesesOrdenados = Object.keys(agregados).sort();
+      const resumo = {};
+      let prejuizoAcumulado = 0;
+      let anoAtual = null;
+      let creditoIrrfAno = 0;
+
+      mesesOrdenados.forEach(chave => {
+        const dados = agregados[chave];
+        const ano = chave.slice(0, 4);
+
+        if(ano !== anoAtual){
+          anoAtual = ano;
+          creditoIrrfAno = 0;
+        }
+
+        creditoIrrfAno += dados.irrf || 0;
+
+        let prejuizoCompensado = 0;
+        let baseTributavel = 0;
+
+        if(dados.resultadoMes <= 0){
+          prejuizoAcumulado += Math.abs(dados.resultadoMes);
+        } else {
+          prejuizoCompensado = Math.min(prejuizoAcumulado, dados.resultadoMes);
+          baseTributavel = dados.resultadoMes - prejuizoCompensado;
+          prejuizoAcumulado -= prejuizoCompensado;
+        }
+
+        const irDevido = baseTributavel > 0 ? baseTributavel * 0.20 : 0;
+        const irrfUsado = Math.min(irDevido, creditoIrrfAno);
+        creditoIrrfAno -= irrfUsado;
+        const darfEstimada = Math.max(0, irDevido - irrfUsado);
+        const saldoMesAposIR = dados.resultadoMes - irDevido;
+
+        resumo[chave] = {
+          ...dados,
+          prejuizoCompensado,
+          baseTributavel,
+          irDevido,
+          irrfUsado,
+          darfEstimada,
+          prejuizoAcumulado,
+          creditoIrrfAno,
+          saldoMesAposIR
+        };
       });
 
-      return mapa;
+      return { resumo, mesesOrdenados, prejuizoFinal: prejuizoAcumulado };
     }
 
     function atualizarCalculosTela(){
       const bruto = parseNumero(elBruto.value);
       const taxas = parseNumero(elTaxas.value);
+      const irrf = parseNumero(elIrrf.value);
       const data = elData.value || hojeISO();
       const resultadoDia = calcularResultadoDia(bruto, taxas);
 
@@ -520,32 +588,47 @@
         data,
         bruto,
         taxas,
+        irrf,
         resultadoDia
       };
 
-      const resumoMensal = obterResumoMensal(preview);
+      const { resumo } = calcularResumoFiscal(preview);
       const chaveMes = obterAnoMes(data);
-      const dadosMes = resumoMensal[chaveMes] || { imposto: 0, saldoMes: 0 };
+      const dadosMes = resumo[chaveMes] || {
+        darfEstimada: 0,
+        saldoMesAposIR: 0,
+        prejuizoAcumulado: 0
+      };
 
-      elImposto.value = formatarMoeda(dadosMes.imposto);
+      elDarfMes.value = formatarMoeda(dadosMes.darfEstimada);
       elResultadoDia.textContent = formatarMoeda(resultadoDia);
       elResultadoDia.className = "value " + (resultadoDia >= 0 ? "positive" : "negative");
-      elSaldoMes.textContent = formatarMoeda(dadosMes.saldoMes);
-      elSaldoMes.className = "value " + (dadosMes.saldoMes >= 0 ? "positive" : "negative");
+      elSaldoMes.textContent = formatarMoeda(dadosMes.saldoMesAposIR);
+      elSaldoMes.className = "value " + (dadosMes.saldoMesAposIR >= 0 ? "positive" : "negative");
+      elPrejuizoCompensar.textContent = formatarMoeda(dadosMes.prejuizoAcumulado);
+      elPrejuizoCompensar.className = "value " + (dadosMes.prejuizoAcumulado > 0 ? "negative" : "positive");
 
-      const saldoGeralPreview = Object.values(resumoMensal).reduce((acc, mes) => acc + mes.saldoMes, 0);
+      const saldoGeralPreview = Object.values(resumo).reduce((acc, mes) => acc + mes.saldoMesAposIR, 0);
       elSaldoGeral.textContent = formatarMoeda(saldoGeralPreview);
       elSaldoGeral.className = "value " + (saldoGeralPreview >= 0 ? "positive" : "negative");
     }
 
     function atualizarResumo(){
-      const resumoMensal = obterResumoMensal();
+      const { resumo, mesesOrdenados, prejuizoFinal } = calcularResumoFiscal();
       const mesAtual = obterAnoMes(hojeISO());
-      const saldoMesAtual = resumoMensal[mesAtual]?.saldoMes || 0;
-      const saldoGeral = Object.values(resumoMensal).reduce((acc, item) => acc + item.saldoMes, 0);
+      const dadosMesAtual = resumo[mesAtual] || {
+        saldoMesAposIR: 0,
+        darfEstimada: 0,
+        prejuizoAcumulado: prejuizoFinal
+      };
 
-      elSaldoMes.textContent = formatarMoeda(saldoMesAtual);
-      elSaldoMes.className = "value " + (saldoMesAtual >= 0 ? "positive" : "negative");
+      elSaldoMes.textContent = formatarMoeda(dadosMesAtual.saldoMesAposIR);
+      elSaldoMes.className = "value " + (dadosMesAtual.saldoMesAposIR >= 0 ? "positive" : "negative");
+      elDarfMes.value = formatarMoeda(dadosMesAtual.darfEstimada || 0);
+      elPrejuizoCompensar.textContent = formatarMoeda(prejuizoFinal);
+      elPrejuizoCompensar.className = "value " + (prejuizoFinal > 0 ? "negative" : "positive");
+
+      const saldoGeral = mesesOrdenados.reduce((acc, chave) => acc + resumo[chave].saldoMesAposIR, 0);
       elSaldoGeral.textContent = formatarMoeda(saldoGeral);
       elSaldoGeral.className = "value " + (saldoGeral >= 0 ? "positive" : "negative");
     }
@@ -554,6 +637,7 @@
       const data = elData.value;
       const bruto = parseNumero(elBruto.value);
       const taxas = parseNumero(elTaxas.value);
+      const irrf = parseNumero(elIrrf.value);
       const resultadoDia = calcularResultadoDia(bruto, taxas);
 
       if(!data){
@@ -571,15 +655,14 @@
         data,
         bruto,
         taxas,
+        irrf,
         resultadoDia,
         criadoEm: new Date().toISOString()
       };
 
       if(editandoId){
         const indice = resultados.findIndex(item => item.id === editandoId);
-        if(indice !== -1){
-          resultados[indice] = registro;
-        }
+        if(indice !== -1) resultados[indice] = registro;
         mostrarStatus("Registro atualizado com sucesso.", "ok");
       }else{
         resultados.push(registro);
@@ -615,9 +698,7 @@
 
       resultados = resultados.filter(r => r.id !== selecionadoId);
       selecionadoId = null;
-      if(editandoId === item.id){
-        editandoId = null;
-      }
+      if(editandoId === item.id) editandoId = null;
       salvarResultadosNoStorage();
       renderTabela();
       atualizarResumo();
@@ -635,6 +716,7 @@
       elData.value = item.data;
       elBruto.value = item.bruto;
       elTaxas.value = item.taxas;
+      elIrrf.value = item.irrf || "";
       atualizarCalculosTela();
 
       btnSalvar.textContent = "Atualizar Resultado";
@@ -647,7 +729,7 @@
       if(redefinirData) elData.value = hojeISO();
       elBruto.value = "";
       elTaxas.value = "";
-      elImposto.value = formatarMoeda(0);
+      elIrrf.value = "";
       elResultadoDia.textContent = formatarMoeda(0);
       elResultadoDia.className = "value";
       editandoId = null;
@@ -659,7 +741,7 @@
       if(resultados.length === 0){
         elTabela.innerHTML = `
           <tr>
-            <td colspan="7" class="empty">Nenhum resultado lançado ainda.</td>
+            <td colspan="8" class="empty">Nenhum resultado lançado ainda.</td>
           </tr>
         `;
         return;
@@ -674,6 +756,7 @@
           <td>${formatarData(item.data)}</td>
           <td>${formatarMoeda(item.bruto)}</td>
           <td>${formatarMoeda(item.taxas)}</td>
+          <td>${formatarMoeda(item.irrf || 0)}</td>
           <td class="${item.resultadoDia >= 0 ? 'positive' : 'negative'}"><strong>${formatarMoeda(item.resultadoDia)}</strong></td>
           <td>${formatarMes(obterAnoMes(item.data))}</td>
           <td>
@@ -687,36 +770,46 @@
     }
 
     function abrirHistorico(){
-      const resumoMensal = obterResumoMensal();
-      const mesesOrdenados = Object.keys(resumoMensal).sort().reverse();
+      const { resumo, mesesOrdenados, prejuizoFinal } = calcularResumoFiscal();
+      const mesesDesc = [...mesesOrdenados].reverse();
 
-      if(mesesOrdenados.length === 0){
+      if(mesesDesc.length === 0){
         tabelaHistoricoMensal.innerHTML = `
           <tr>
-            <td colspan="5" class="empty">Nenhum mês lançado ainda.</td>
+            <td colspan="11" class="empty">Nenhum mês lançado ainda.</td>
           </tr>
         `;
         historicoAcumuladoGeral.textContent = formatarMoeda(0);
         historicoAcumuladoGeral.className = "value";
+        historicoPrejuizoAtual.textContent = formatarMoeda(0);
+        historicoPrejuizoAtual.className = "value";
         historicoTotalMeses.textContent = "0";
       } else {
-        tabelaHistoricoMensal.innerHTML = mesesOrdenados.map(chave => {
-          const item = resumoMensal[chave];
+        tabelaHistoricoMensal.innerHTML = mesesDesc.map(chave => {
+          const item = resumo[chave];
           return `
             <tr>
               <td>${formatarMes(chave)}</td>
               <td>${formatarMoeda(item.bruto)}</td>
               <td>${formatarMoeda(item.taxas)}</td>
-              <td>${formatarMoeda(item.imposto)}</td>
-              <td class="${item.saldoMes >= 0 ? 'positive' : 'negative'}"><strong>${formatarMoeda(item.saldoMes)}</strong></td>
+              <td>${formatarMoeda(item.irrf)}</td>
+              <td class="${item.resultadoMes >= 0 ? 'positive' : 'negative'}">${formatarMoeda(item.resultadoMes)}</td>
+              <td>${formatarMoeda(item.prejuizoCompensado)}</td>
+              <td>${formatarMoeda(item.baseTributavel)}</td>
+              <td>${formatarMoeda(item.irDevido)}</td>
+              <td>${formatarMoeda(item.irrfUsado)}</td>
+              <td>${formatarMoeda(item.darfEstimada)}</td>
+              <td class="${item.prejuizoAcumulado > 0 ? 'negative' : 'positive'}"><strong>${formatarMoeda(item.prejuizoAcumulado)}</strong></td>
             </tr>
           `;
         }).join("");
 
-        const acumuladoGeral = mesesOrdenados.reduce((acc, chave) => acc + resumoMensal[chave].saldoMes, 0);
+        const acumuladoGeral = mesesOrdenados.reduce((acc, chave) => acc + resumo[chave].saldoMesAposIR, 0);
         historicoAcumuladoGeral.textContent = formatarMoeda(acumuladoGeral);
         historicoAcumuladoGeral.className = "value " + (acumuladoGeral >= 0 ? "positive" : "negative");
-        historicoTotalMeses.textContent = String(mesesOrdenados.length);
+        historicoPrejuizoAtual.textContent = formatarMoeda(prejuizoFinal);
+        historicoPrejuizoAtual.className = "value " + (prejuizoFinal > 0 ? "negative" : "positive");
+        historicoTotalMeses.textContent = String(mesesDesc.length);
       }
 
       modalHistorico.classList.add("show");
