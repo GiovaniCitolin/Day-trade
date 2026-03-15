@@ -371,7 +371,6 @@
                 <th>Mês</th>
                 <th>Total Bruto</th>
                 <th>Total Taxas</th>
-                <th>Saldo Antes do IR</th>
                 <th>IR do Mês (20%)</th>
                 <th>Saldo do Mês</th>
               </tr>
@@ -694,10 +693,11 @@
       if(mesesOrdenados.length === 0){
         tabelaHistoricoMensal.innerHTML = `
           <tr>
-            <td colspan="6" class="empty">Nenhum mês lançado ainda.</td>
+            <td colspan="5" class="empty">Nenhum mês lançado ainda.</td>
           </tr>
         `;
         historicoAcumuladoGeral.textContent = formatarMoeda(0);
+        historicoAcumuladoGeral.className = "value";
         historicoTotalMeses.textContent = "0";
       } else {
         tabelaHistoricoMensal.innerHTML = mesesOrdenados.map(chave => {
@@ -707,7 +707,6 @@
               <td>${formatarMes(chave)}</td>
               <td>${formatarMoeda(item.bruto)}</td>
               <td>${formatarMoeda(item.taxas)}</td>
-              <td class="${item.saldoAntesIR >= 0 ? 'positive' : 'negative'}">${formatarMoeda(item.saldoAntesIR)}</td>
               <td>${formatarMoeda(item.imposto)}</td>
               <td class="${item.saldoMes >= 0 ? 'positive' : 'negative'}"><strong>${formatarMoeda(item.saldoMes)}</strong></td>
             </tr>
